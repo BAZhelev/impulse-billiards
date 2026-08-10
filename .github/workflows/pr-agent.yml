@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   pr_agent:
-    # Only run when a PR comment contains a PR-Agent command
     if: contains(fromJSON('["/review", "/describe", "/improve", "/ask", "/reflect", "/update_changelog", "/add_docs"]'), github.event.comment.body)
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -20,4 +19,6 @@ jobs:
       - uses: Codium-ai/pr-agent@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          OPENAI_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_BASE: "https://api.deepseek.com"
+          CONFIG_MODEL: "deepseek-chat"

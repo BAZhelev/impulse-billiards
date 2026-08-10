@@ -1,0 +1,6 @@
+[config]
+model = "deepseek-chat"
+
+[pr_reviewer]
+# DeepSeek is fast and cheap — keep inline suggestions on
+inline_code_comments = true

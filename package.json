@@ -1,5 +1,5 @@
 {
-  "name": "impulse-billards",
+  "name": "impulse-billiards",
   "private": true,
   "scripts": {
     "build": "turbo run build",

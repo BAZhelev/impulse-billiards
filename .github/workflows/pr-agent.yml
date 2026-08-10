@@ -1,0 +1,23 @@
+name: PR Agent
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  pr_agent:
+    # Only run when a PR comment contains a PR-Agent command
+    if: contains(fromJSON('["/review", "/describe", "/improve", "/ask", "/reflect", "/update_changelog", "/add_docs"]'), github.event.comment.body)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: Codium-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}

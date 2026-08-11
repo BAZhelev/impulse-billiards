@@ -5,11 +5,53 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+
     groups:
-      all-deps:
+      react:
         patterns:
-          - "*"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+
+      eslint:
+        patterns:
+          - "eslint"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+          - "eslint-config-*"
+          - "eslint-plugin-*"
+          - "@eslint/js"
+          - "globals"
+
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+
+      dev-tools:
+        patterns:
+          - "turbo"
+          - "prettier"
+          - "husky"
+          - "lint-staged"
+          - "@changesets/*"
+          - "@commitlint/*"
+        dependency-type: "development"
+
     ignore:
+      # Block major bumps — peer dep contracts change, need human review
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      # Suppress patch-only noise
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
 
@@ -18,3 +60,12 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    groups:
+      ci-actions:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "actions/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pnpm/action-setup"
+        update-types: ["version-update:semver-major"]

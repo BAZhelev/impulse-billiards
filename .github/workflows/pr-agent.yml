@@ -12,7 +12,7 @@ permissions:
 jobs:
   pr_agent:
     if: contains(fromJSON('["/review", "/describe", "/improve", "/ask", "/reflect", "/update_changelog", "/add_docs"]'), github.event.comment.body)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:

@@ -16,8 +16,6 @@ Impulse Billiards is a Turborepo monorepo with two primary applications:
 | `apps/web` | Static Next.js (exported)          | Public-facing website, served via CDN                 |
 | `apps/cms` | Payload CMS (Node.js + PostgreSQL) | Headless CMS for content management, admin panel, API |
 
-> `apps/docs` also exists in the repo but is leftover scaffolding from the `create-turbo` template (Turborepo/Vercel boilerplate) — not part of the product, and a candidate for removal.
-
 Compute and databases run on **Hetzner** VPSes; the static website runs on **Cloudflare Pages**; media and database backups are stored on **GCP Cloud Storage** — media is served to users through the **Cloudflare CDN**; DNS and CDN run on **Cloudflare**. The design prioritises simplicity, low cost, and operational clarity with minimal third-party dependencies.
 
 ---
@@ -135,15 +133,11 @@ impulse-billards/
 │ ├── web/ # Static Next.js — public website
 │ │ ├── package.json
 │ │ └── ...
-│ ├── docs/ # Leftover create-turbo template — not part of the product (remove or repurpose)
-│ │ ├── package.json
-│ │ └── ...
 │ └── cms/ # Payload CMS — admin + API (to be scaffolded)
 │ ├── Dockerfile
 │ ├── package.json
 │ └── ...
 ├── packages/
-│ ├── ui/ # Shared UI components
 │ ├── eslint-config/ # Shared ESLint config
 │ └── typescript-config/ # Shared TS config
 ├── infra/                    # Infrastructure configs

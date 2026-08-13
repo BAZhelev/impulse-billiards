@@ -16,7 +16,8 @@ export default [
   // apps/web (Next.js App Router)
   ...nextJsConfig.map((c) => ({
     ...c,
-    files: ["apps/web/**/*.{js,jsx,ts,tsx}"],
+    files: ["apps/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["src/payload-types.ts", "src/payload-generated-schema.ts"],
     rules: {
       ...c.rules,
       "@next/next/no-html-link-for-pages": ["error", "apps/web/app"],

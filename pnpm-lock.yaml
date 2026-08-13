@@ -38,54 +38,8 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
-  apps/docs:
-    dependencies:
-      "@repo/ui":
-        specifier: workspace:*
-        version: link:../../packages/ui
-      "@t3-oss/env-nextjs":
-        specifier: ^0.13.11
-        version: 0.13.11(typescript@5.9.2)(zod@4.4.3)
-      next:
-        specifier: 16.3.0
-        version: 16.3.0(@types/node@22.15.3)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      "@repo/eslint-config":
-        specifier: workspace:*
-        version: link:../../packages/eslint-config
-      "@repo/typescript-config":
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      "@types/node":
-        specifier: ^22.15.3
-        version: 22.15.3
-      "@types/react":
-        specifier: 19.2.2
-        version: 19.2.2
-      "@types/react-dom":
-        specifier: 19.2.2
-        version: 19.2.2(@types/react@19.2.2)
-      eslint:
-        specifier: ^9.39.1
-        version: 9.39.1(jiti@2.6.1)
-      typescript:
-        specifier: 5.9.2
-        version: 5.9.2
-
   apps/web:
     dependencies:
-      "@repo/ui":
-        specifier: workspace:*
-        version: link:../../packages/ui
       "@t3-oss/env-nextjs":
         specifier: ^0.13.11
         version: 0.13.11(typescript@5.9.2)(zod@4.4.3)
@@ -161,37 +115,6 @@ importers:
         version: 8.50.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.2)
 
   packages/typescript-config: {}
-
-  packages/ui:
-    dependencies:
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
-    devDependencies:
-      "@repo/eslint-config":
-        specifier: workspace:*
-        version: link:../eslint-config
-      "@repo/typescript-config":
-        specifier: workspace:*
-        version: link:../typescript-config
-      "@types/node":
-        specifier: ^22.15.3
-        version: 22.15.3
-      "@types/react":
-        specifier: 19.2.2
-        version: 19.2.2
-      "@types/react-dom":
-        specifier: 19.2.2
-        version: 19.2.2(@types/react@19.2.2)
-      eslint:
-        specifier: ^9.39.1
-        version: 9.39.1(jiti@2.6.1)
-      typescript:
-        specifier: 5.9.2
-        version: 5.9.2
 
 packages:
   "@babel/code-frame@7.29.7":

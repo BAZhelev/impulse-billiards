@@ -22,7 +22,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${process.env.PORT ?? 3001}`,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
@@ -36,6 +36,11 @@ export default defineConfig({
   webServer: {
     command: "pnpm dev",
     reuseExistingServer: true,
-    url: "http://localhost:3000",
+    url: `http://localhost:${process.env.PORT ?? 3001}`,
+    // Point the dev server at the test database so e2e tests are isolated from dev data.
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL ?? "",
+      PAYLOAD_SECRET: process.env.PAYLOAD_SECRET ?? "",
+    },
   },
 });

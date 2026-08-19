@@ -8,10 +8,10 @@ and its content management system.
 Impulse Billiards is a billiards website managed through a headless CMS. The
 project is a pnpm + Turborepo monorepo with two applications:
 
-| App        | Type                                                          | Purpose                                                             |
-| ---------- | ------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `apps/web` | Static [Next.js](https://nextjs.org/) export                  | Public website, served via CDN                                      |
-| `apps/cms` | [Payload CMS](https://payloadcms.com/) (Node.js + PostgreSQL) | Headless CMS: content management, admin panel & API _(to be added)_ |
+| App        | Type                                                          | Purpose                                             |
+| ---------- | ------------------------------------------------------------- | --------------------------------------------------- |
+| `apps/web` | Static [Next.js](https://nextjs.org/) export                  | Public website, served via CDN                      |
+| `apps/cms` | [Payload CMS](https://payloadcms.com/) (Node.js + PostgreSQL) | Headless CMS: content management, admin panel & API |
 
 Shared configuration lives in [`packages/`](packages):
 
@@ -32,14 +32,14 @@ Shared configuration lives in [`packages/`](packages):
 - [Next.js](https://nextjs.org/) (static export) — `apps/web`
 - [Payload CMS](https://payloadcms.com/) + [PostgreSQL](https://www.postgresql.org/) — `apps/cms`
 - [Turborepo](https://turborepo.dev) + [pnpm](https://pnpm.io) — monorepo tooling
-- [Docker Compose](https://docs.docker.com/compose/) — local & server deployment _(to be added)_
+- [Docker Compose](https://docs.docker.com/compose/) — local Postgres (server deployment to be added)
 
 ## Repository structure
 
 ```
 ├── apps/
 │   ├── web/   # Static Next.js — public website
-│   └── cms/   # Payload CMS — admin + API (to be scaffolded)
+│   └── cms/   # Payload CMS — admin + API
 ├── packages/
 │   ├── eslint-config/     # Shared ESLint configuration
 │   └── typescript-config/ # Shared TypeScript configuration
@@ -50,7 +50,7 @@ Shared configuration lives in [`packages/`](packages):
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 18
+- [Node.js](https://nodejs.org/) >= 20.9
 - [pnpm](https://pnpm.io/) 9 (pinned to `pnpm@9.0.0` via `packageManager`)
 
 ### Install
@@ -59,14 +59,23 @@ Shared configuration lives in [`packages/`](packages):
 pnpm install
 ```
 
+### Environment variables
+
+Each app reads its own `.env` (Next.js loads it from the app's directory):
+
+- `apps/web/.env` — `PORT` (default `3000`).
+- `apps/cms/.env` — `PORT` (default `3001`), `DATABASE_URL`, `PAYLOAD_SECRET`.
+- `apps/cms/.env.test` — test config (isolated `cms_test` database) for `test:int` / `test:e2e`.
+
 ### Develop
 
 ```sh
 pnpm dev
 ```
 
-Starts the development servers for all apps (currently `apps/web` on
-[http://localhost:3000](http://localhost:3000)).
+Starts both apps: `apps/web` on `http://localhost:3000` and `apps/cms` on
+`http://localhost:3001`. The CMS provisions the local Postgres database first
+(via its `predev` hook), so Docker must be running.
 
 ### Build, lint & type-check
 
@@ -77,14 +86,27 @@ pnpm check-types  # type-check all apps and packages
 pnpm test         # run tests
 ```
 
-### Docker & CMS — _to be added_
+### CMS — local database & tests
 
-The CMS app and the container/infrastructure setup are not scaffolded yet.
-Planned:
+A root `docker-compose.yml` provides local PostgreSQL:
 
-- `apps/cms` — Payload CMS with PostgreSQL
-- `Dockerfile`s and `compose.prod.yml` / `compose.staging.yml`
-- Reverse proxy (Caddy) and deployment/backup scripts
+```sh
+docker compose up -d postgres   # or: pnpm --filter cms db:provision
+```
+
+The `db:provision` script starts Postgres and waits for it to be ready. Payload
+creates the `cms` (dev) and `cms_test` (test) databases and their schema
+automatically on first connect.
+
+Tests are separate commands, isolated from dev data via the `cms_test` database:
+
+```sh
+pnpm --filter cms test:int   # integration tests (Vitest)
+pnpm --filter cms test:e2e   # end-to-end tests (Playwright)
+```
+
+> `pnpm test` is reserved for unit tests; integration and e2e tests are separate
+> because they need the local database.
 
 ## Documentation
 

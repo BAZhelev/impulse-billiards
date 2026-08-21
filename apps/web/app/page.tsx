@@ -1,3 +1,4 @@
+"use client";
 import Image, { type ImageProps } from "next/image";
 import { JSX, ReactNode } from "react";
 import styles from "./page.module.css";

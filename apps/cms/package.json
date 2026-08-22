@@ -8,7 +8,7 @@
     "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build",
     "check-types": "tsc --noEmit",
     "db:provision": "bash ./scripts/provision-db.sh",
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "generate:importmap": "payload generate:importmap",
     "generate:types": "payload generate:types",
     "lint": "eslint --max-warnings 0 --no-warn-ignored",

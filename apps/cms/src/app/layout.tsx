@@ -2,12 +2,12 @@
 /* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
 import config from "@payload-config";
 import "@payloadcms/next/css";
-import type { ServerFunctionClient } from "payload";
 import { handleServerFunctions, RootLayout } from "@payloadcms/next/layouts";
+import type { ServerFunctionClient } from "payload";
 import React from "react";
 
-import { importMap } from "./admin/importMap.js";
 import "./custom.scss";
+import { importMap } from "./importMap.js";
 
 type Args = {
   children: React.ReactNode;

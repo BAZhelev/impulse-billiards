@@ -32,9 +32,11 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL || "",
     },
-    // Auto-sync the schema in dev/test. Replace with `payload migrate` when
-    // staging/production is set up.
-    push: true,
+    // Migrations are run by CI (expand/contract), never by the app.
+    // `PAYLOAD_MIGRATION_DIR` selects expand vs contract in the deploy pipeline.
+    migrationDir: process.env.PAYLOAD_MIGRATION_DIR || "src/migrations/expand",
+    // Auto-sync the schema in local dev only; deployed environments never push.
+    push: process.env.NODE_ENV === "development",
   }),
   sharp,
   plugins: [],

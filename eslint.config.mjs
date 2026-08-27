@@ -11,6 +11,7 @@ export default [
       "**/build/**",
       "**/out/**",
       "**/next-env.d.ts",
+      "**/src/migrations/**",
     ],
   },
   // apps/web (Next.js App Router)

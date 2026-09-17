@@ -10,8 +10,7 @@
     "GITHUB_PAT",
     "GITHUB_REPO",
     "GITHUB_WORKFLOW",
-    "GITHUB_REF",
-    "PAYLOAD_MIGRATION_DIR"
+    "GITHUB_REF"
   ],
   "tasks": {
     "build": {

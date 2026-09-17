@@ -8,9 +8,9 @@ export async function GET() {
   try {
     const payload = await getPayload({ config });
 
-    // Ping the database. With `prodMigrations` enabled, Payload also runs any
-    // pending migrations before initialising, so a successful init implies the
-    // schema is current.
+    // Ping the database to confirm connectivity. NOTE: migrations are applied by
+    // the migrator image in CI (before deploy), not here — so this check does not
+    // verify that applied migrations match the bundled files.
     await payload.db.pool.query("SELECT 1");
 
     return Response.json({ status: "ok" }, { status: 200 });

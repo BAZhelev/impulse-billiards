@@ -1,13 +1,35 @@
-node_modules
-.git
-.next
-.turbo
+# ---- Dependencies (at any nesting level) ----
+**/node_modules
+
+# ---- Build outputs & caches ----
+**/.next
+**/.turbo
+**/dist
+**/build
+**/coverage
 out
-dist
-build
-coverage
+
+# ---- VCS / CI / docs (not needed to build the image) ----
+.git
+.github
+.docs
+**/*.md
+
+# ---- Secrets & local env (never bake into the image) ----
 .env
+**/.env
 .env.*
+**/.env.*
+
+# ---- Local Payload media uploads ----
 apps/cms/media
+
+# ---- Deploy-only files (not needed to build the image) ----
+docker-compose.yml
+compose*.yml
+Caddyfile*
+
+# ---- Misc ----
 .DS_Store
 *.pem
+*.log

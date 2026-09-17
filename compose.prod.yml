@@ -1,8 +1,8 @@
-# Staging deployment — single VPS with Caddy + CMS + PostgreSQL (per .docs/architecture.md).
+# Production deployment — Caddy + CMS + PostgreSQL (per .docs/architecture.md).
+# NOTE: docs call for a separate DB VPS in production; this bundles Postgres for
+# now and can be split later by pointing DATABASE_URL at an external host.
 # Runtime secrets live in a `.env` file next to this compose file on the VPS
 # (POSTGRES_PASSWORD, PAYLOAD_SECRET, GITHUB_PAT, GITHUB_REPO, GITHUB_REF).
-# Create it manually on the server, then:
-#   docker compose -f compose.staging.yml up -d
 services:
   caddy:
     image: caddy:2-alpine
@@ -11,7 +11,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

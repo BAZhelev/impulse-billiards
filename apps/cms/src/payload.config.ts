@@ -32,9 +32,8 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL || "",
     },
-    // Migrations are run by CI (expand/contract), never by the app.
-    // `PAYLOAD_MIGRATION_DIR` selects expand vs contract in the deploy pipeline.
-    migrationDir: process.env.PAYLOAD_MIGRATION_DIR || "src/migrations/expand",
+    // Migrations are run by CI (single-phase, before deploy), never by the app.
+    migrationDir: "src/migrations",
     // Auto-sync the schema in local dev only; deployed environments never push.
     push: process.env.NODE_ENV === "development",
   }),

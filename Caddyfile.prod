@@ -1,0 +1,9 @@
+# Reverse proxy for the Payload CMS (admin + API) in production.
+# Cloudflare terminates public TLS; Caddy serves a self-signed origin cert
+# (Cloudflare SSL/TLS mode: "Full"). Swap `tls internal` for a Cloudflare
+# Origin Certificate when moving to "Full (strict)".
+admin.impulse-billiards.com {
+	tls internal
+	encode gzip
+	reverse_proxy cms:3000
+}

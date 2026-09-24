@@ -1,71 +1,110 @@
-# To use this Dockerfile, you have to set `output: 'standalone'` in your next.config.mjs file.
-# From https://github.com/vercel/next.js/blob/canary/examples/with-docker/Dockerfile
+# syntax=docker/dockerfile:1
 
-FROM node:22.17.0-alpine AS base
+# Impulse Billiards — Payload CMS images.
+#
+# Built from the monorepo root (build context = repo root). Uses Turborepo
+# `prune` to derive a lockfile-consistent subset so any current/future @repo/*
+# package is picked up automatically (no frozen-lockfile mismatch when a new
+# workspace package is added).
+#
+# Two final images (built from the same stages):
+#   runner   (default)  — standalone Next.js server (`node server.js`), no source
+#   migrator (--target) — `payload` CLI + config + migrations for `payload migrate`
 
-# Install dependencies only when needed
-FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+FROM node:22-alpine AS base
+# libc6-compat required by native addons (sharp) on musl/Alpine.
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable pnpm
+# Point pnpm's store at the BuildKit cache mount. PNPM_HOME only relocates the
+# pnpm binary; the store dir is independent, so set it explicitly.
+RUN pnpm config set store-dir /pnpm/store
 
-# Install dependencies based on the preferred package manager
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+# --- Pruner: lockfile-consistent subset of the monorepo for apps/cms. ---
+FROM base AS pruner
+WORKDIR /app
+# Pin to the repo's Turbo version (root package.json -> turbo ^2.10.9).
+RUN npm install --global turbo@2.10.9
+COPY . .
+# Emits out/json (pruned manifests), out/pnpm-lock.yaml (pruned lockfile),
+# out/full (pruned source).
+RUN turbo prune cms --docker
 
+# --- Deps: full dependency graph (build needs dev deps too). ---
+FROM base AS deps
+WORKDIR /app
+COPY --from=pruner /app/out/json/ .
+COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
-# Rebuild the source code only when needed
+# --- Builder: build via Turborepo's task graph, then strip dev deps. ---
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-# ENV NEXT_TELEMETRY_DISABLED 1
+# Build-time env scaffolding. payload.config.ts is imported during `next build`,
+# but every value it reads has a `|| ""` fallback, so the build passes with no
+# env vars at all. Secrets are deliberately NOT declared here (ARG/ENV for
+# PAYLOAD_SECRET is a security anti-pattern and is flagged by linters) — supply
+# them at RUNTIME via compose `environment` (compose.prod.yml).
+#   DATABASE_URL   — imported at build (postgresAdapter pool), but the adapter
+#                    does not connect during build; "" is fine. Real value: runtime.
+#   PAYLOAD_SECRET — imported at build (buildConfig secret), "" is fine at build;
+#                    real value: runtime. Never pass via --build-arg.
+ARG DATABASE_URL=""
+ENV DATABASE_URL=$DATABASE_URL
+# If a future change makes a secret REQUIRED at build time, use BuildKit secrets:
+#   docker build --secret id=secret,src=... ; RUN --mount=type=secret,id=secret ...
 
-RUN \
-  if [ -f yarn.lock ]; then yarn run build; \
-  elif [ -f package-lock.json ]; then npm run build; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# Full node_modules tree (root store + per-package symlinks/.bin). pnpm creates
+# apps/cms/node_modules and packages/*/node_modules, which `next build`/
+# `cross-env` need — copying only the root store is not enough.
+COPY --from=deps /app ./
+COPY --from=pruner /app/out/full/ .
+COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+# Respect upstream @repo/* builds and Turborepo's cache. `turbo` is installed as
+# a root devDependency (available in node_modules/.bin), so run it via pnpm.
+RUN pnpm exec turbo run build --filter=cms
+
+# --- Migrator: runs `payload migrate` in CI (single-phase, before deploy). ---
+FROM base AS migrator
+ENV NODE_ENV=production
+ENV PAYLOAD_CONFIG_PATH="/app/apps/cms/src/payload.config.ts"
+ENV PATH="/app/apps/cms/node_modules/.bin:${PATH}"
 WORKDIR /app
+# Reuse the same frozen-lockfile install as the builder (no second install).
+# `payload` is a prod dep so `payload migrate` works; the extra dev deps are
+# harmless in this transient `run --rm` image.
+COPY --from=deps /app ./
+# Config + collections + migrations source (only what the CLI needs).
+COPY --from=pruner /app/out/full/ .
+WORKDIR /app/apps/cms
+CMD ["payload", "migrate"]
 
-ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+# --- Runner: minimal standalone runtime (no source, no full node_modules). ---
+FROM base AS runner
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser --system --uid 1001 nextjs
 
-# Remove this line if you do not have this folder
-COPY --from=builder /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+WORKDIR /app
+# Standalone traced server (nested under apps/cms due to outputFileTracingRoot).
+COPY --from=builder --chown=nextjs:nodejs /app/apps/cms/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/cms/.next/static ./apps/cms/.next/static
 
 USER nextjs
-
 EXPOSE 3000
 
-ENV PORT 3000
+# /api/health already exists (GET -> 200 with DB ping; 503 on failure).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1
 
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD HOSTNAME="0.0.0.0" node server.js
+CMD ["node", "apps/cms/server.js"]

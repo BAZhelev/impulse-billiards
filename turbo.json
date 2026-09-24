@@ -1,7 +1,17 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  "globalEnv": ["DATABASE_URL", "PAYLOAD_SECRET", "CI", "PORT"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "PAYLOAD_SECRET",
+    "CI",
+    "PORT",
+    "NODE_ENV",
+    "GITHUB_PAT",
+    "GITHUB_REPO",
+    "GITHUB_WORKFLOW",
+    "GITHUB_REF"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

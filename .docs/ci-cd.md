@@ -23,18 +23,17 @@ How code and content move from the repository to production. See [architecture.m
 
 Triggers: PR and push to `dev` + `main`
 
-| Step                   | Description                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| Checkout               | `actions/checkout@v7`                                                                               |
-| Setup                  | pnpm + Node.js 20                                                                                   |
-| Install                | `pnpm install --frozen-lockfile`                                                                    |
-| Lint                   | `turbo run lint`                                                                                    |
-| Type-check             | `turbo run check-types`                                                                             |
-| Test                   | `turbo run test`                                                                                    |
-| Build CMS Docker image | `docker build -t impulse-cms:${{ github.sha }} apps/cms` (BuildKit `--secret`, never `--build-arg`) |
-| Container scan         | Trivy scan the CMS Docker image                                                                     |
-| Static export check    | `next build` (`output: 'export'`) for `apps/web`                                                    |
-| Push image             | Tag and push to `ghcr.io/<org>/impulse-cms:${{ github.sha }}`                                       |
+| Step                | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| Checkout            | `actions/checkout@v7`                                                           |
+| Setup               | pnpm + Node.js 22                                                               |
+| Install             | `pnpm install --frozen-lockfile`                                                |
+| Lint                | `turbo run lint`                                                                |
+| Type-check          | `turbo run check-types`                                                         |
+| Test                | `turbo run test`                                                                |
+| Audit               | `pnpm audit --audit-level=high`                                                 |
+| Static export check | `next build` (`output: 'export'`) for `apps/web`                                |
+| Build Docker images | Build `runner` + `migrator` targets (no push) — validates the Dockerfile builds |
 
 ---
 
@@ -42,14 +41,15 @@ Triggers: PR and push to `dev` + `main`
 
 Trigger: Push to `main` (auto-deploy to staging)
 
-| Step                 | Description                                                                                      |
-| -------------------- | ------------------------------------------------------------------------------------------------ |
-| Pre-migration backup | pgBackRest backup before any schema change (signal S4)                                           |
-| Deploy to staging    | SSH to VPS #3 → `docker compose -f compose.staging.yml pull && up -d`                            |
-| Run migrations       | `docker compose -f compose.staging.yml exec cms payload migrate` (signal S1)                     |
-| Health check         | `curl /api/health` (signal S2) — see [Migration Failure Detection](#migration-failure-detection) |
-| Smoke tests          | `curl` key routes (staging admin, API health) (signal S3)                                        |
-| **On failure**       | Restore DB from pre-migration backup + rollback container, alert to Discord                      |
+| Step                   | Description                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| Build & push images    | `runner` → `…-cms:{sha}` + `latest`; `migrator` → `…-cms-migrate:{sha}` + `latest`  |
+| Container scan         | Trivy scan the runner image (CRITICAL/HIGH → fail)                                  |
+| Sync config            | `scp` `compose.staging.yml` + `Caddyfile` to VPS #3                                 |
+| Migrate (single-phase) | `docker compose --profile migrate run --rm migrate` — before deploy, additive       |
+| Deploy                 | `docker compose up -d` (caddy + cms + postgres)                                     |
+| Health check           | `curl /api/health`, 12 × 5s = 60s budget                                            |
+| **On failure**         | Pipeline exits non-zero; re-point `CMS_IMAGE_TAG` to the last-good sha to roll back |
 
 ---
 
@@ -57,48 +57,45 @@ Trigger: Push to `main` (auto-deploy to staging)
 
 Trigger: Manual (`workflow_dispatch`) — run after staging is verified
 
-| Step                 | Description                                                                                               |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| Pre-migration backup | pgBackRest backup before any schema change (signal S4)                                                    |
-| Deploy CMS           | SSH to VPS #1 → `docker compose -f compose.prod.yml pull && up -d`                                        |
-| Run migrations       | `docker compose -f compose.prod.yml exec cms payload migrate` (signal S1)                                 |
-| Health check         | `curl /api/health` (signal S2) — see [Migration Failure Detection](#migration-failure-detection)          |
-| Smoke tests          | `curl` key routes (admin, API health) (signal S3)                                                         |
-| **On failure**       | Restore DB from pre-migration backup + redeploy previous image (`docker compose up -d`), alert to Discord |
+| Step                   | Description                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| Build & push images    | `runner` → `…-cms:{version}`; `migrator` → `…-cms-migrate:{version}`                |
+| Container scan         | Trivy scan the runner image (CRITICAL/HIGH → fail)                                  |
+| Sync config            | `scp` `compose.prod.yml` + `Caddyfile.prod` to VPS #1                               |
+| Migrate (single-phase) | `docker compose --profile migrate run --rm migrate` — before deploy, additive       |
+| Deploy                 | `docker compose up -d` (caddy + cms + postgres)                                     |
+| Health check           | `curl /api/health`, 12 × 5s = 60s budget                                            |
+| **On failure**         | Pipeline exits non-zero; re-point `CMS_IMAGE_TAG` to the last-good tag to roll back |
 
 ---
 
 ## Migration Failure Detection
 
-Deploy pipelines that run migrations detect failure through an explicit, ordered set of signals — the restore/rollback action fires only when one of them triggers. Because drizzle/Payload migrations are **not** wrapped in a single transaction, a migration can apply _halfway_ and exit non-zero; a non-zero exit is therefore treated as a definitive failure and the DB is restored.
+Deploy pipelines run a **single-phase** migration (`payload migrate`) **before** `docker compose up -d`, so the schema is updated while the previous container keeps serving. Migrations must remain **additive/backward-compatible** (`CREATE TABLE`, `ADD COLUMN`, …) so the old code keeps working against the new schema.
 
-| #   | Signal                       | Detection                                          | Action                                                       |
-| --- | ---------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
-| S4  | Pre-migration backup fails   | pgBackRest exit code ≠ 0                           | Abort the deploy (fail closed) — do not touch code or schema |
-| S1  | Migration fails              | `payload migrate` exit code ≠ 0                    | Restore DB from pre-migration backup + rollback container    |
-| S2  | App not healthy after deploy | `GET /api/health` ≠ 200 within 12 tries × 5s (60s) | Restore DB + rollback container                              |
-| S3  | Smoke test fails             | Key routes return non-200                          | Restore DB + rollback container                              |
+| #   | Signal          | Detection                              | Action                                  |
+| --- | --------------- | -------------------------------------- | --------------------------------------- |
+| S1  | Migration fails | `payload migrate` exit code ≠ 0        | Pipeline exits non-zero — deploy aborts |
+| S2  | App not healthy | `GET /api/health` ≠ 200 within 12 × 5s | Pipeline exits non-zero — deploy aborts |
 
 ### Ordering
 
-1. **S4** — take the pgBackRest backup. If it fails, abort before deploying anything.
-2. Deploy the new image (`pull && up -d`).
-3. Run `payload migrate`, capture the exit code (**S1**).
-4. Health-check loop with a fixed budget of 12 × 5s = 60s (**S2**).
-5. Smoke-test key routes (**S3**).
-6. Only if 1–5 all pass is the deploy marked successful (pre-migration backup retained 90 days; Discord confirmation).
+1. Build & push the `runner` + `migrator` images.
+2. Pull both images on the VPS.
+3. Run `payload migrate` from the migrator image (**S1**).
+4. `docker compose up -d`.
+5. Health-check loop with a 12 × 5s = 60s budget (**S2**).
+
+Each migration runs in its own transaction, so a failed migration rolls back cleanly — but a batch of migrations is not atomic, so a later migration can still fail after earlier ones committed.
 
 ### `/api/health` contract
 
-`GET /api/health` returns 200 **only** when the CMS is ready **and** the database schema is current — the set of applied migrations matches the bundled migration files. A health check that merely pings DB connectivity would not catch a "migrated but broken" schema, so the endpoint must compare applied migrations (drizzle `migrations` table) against the migration files shipped in the image.
+`GET /api/health` currently pings the database (`SELECT 1`) and returns 200 on success, 503 on failure. ⚠️ It does **not** yet verify that applied migrations match the bundled files (the "schema is current" check) — a known gap to close if the health gate must catch "migrated but broken" schemas.
 
 ### Rollback scope
 
-- **Migration-related failure** (S1, or S2 after migrations ran) → restore the DB from the pre-migration backup _and_ roll back the container. Docker alone cannot undo a schema change.
-- **Pure deploy/startup failure** (S2 before migrations ran) → roll back the container only; the schema was never touched, so the DB restore is skipped. Pipelines track a `migrationsRan` flag to decide.
-- **Restore verification** → after restoring, the pipeline re-runs the health check against the rolled-back image before declaring recovery complete.
-
-> **How the rollback works**: Docker Compose has no `--rollback` flag (that's a Swarm feature). "Roll back the container" = re-point the image to the last-known-good `{sha}` tag and run `docker compose up -d` again — the previous image is still in GHCR, so no rebuild is needed.
+- **Migration failure** (`S1`) → the pipeline exits non-zero. The schema may be partially applied, so a manual restore may be required; automated pgBackRest backup/restore is **planned but not implemented**.
+- **Deploy/startup failure** (`S2`) → re-point `CMS_IMAGE_TAG` to the last-known-good tag and `docker compose up -d` again (the previous image is still in GHCR; no rebuild needed).
 
 ---
 

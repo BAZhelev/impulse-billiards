@@ -1,5 +1,7 @@
 import type { CollectionConfig } from "payload";
 
+import { redeployOnPublish } from "../hooks/redeploy-site";
+
 export const Pages: CollectionConfig = {
   slug: "pages",
   admin: {
@@ -9,6 +11,9 @@ export const Pages: CollectionConfig = {
     read() {
       return true;
     },
+  },
+  hooks: {
+    afterChange: [redeployOnPublish],
   },
   fields: [
     {

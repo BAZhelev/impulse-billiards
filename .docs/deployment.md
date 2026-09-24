@@ -51,8 +51,10 @@ build fetches published content → wrangler pages deploy (atomic)
 
 ## Payload CMS — Production (`apps/cms`)
 
-1. Docker image built in CI, pushed to GHCR with `{sha}` and `latest` tags
-2. Deployed via `compose.prod.yml` on VPS #1
+1. Two Docker images built in CI, pushed to GHCR:
+   - `runner` (standalone Next.js server) → `…-cms:{sha}` + `latest`
+   - `migrator` (`payload` CLI + config + migrations) → `…-cms-migrate:{sha}` + `latest`
+2. Deployed via `compose.prod.yml` on VPS #1; the `migrate` service is profile-gated and runs as a one-shot before deploy
 3. Caddy reverse proxy handles:
    - SSL termination via Cloudflare Origin Certificate (admin is proxied through Cloudflare)
    - Routing: `admin.impulse-billiards.com` → Payload CMS container on port 3000
@@ -60,8 +62,10 @@ build fetches published content → wrangler pages deploy (atomic)
 5. Environment variables injected at deploy time (never committed):
    - `DATABASE_URL` — PostgreSQL connection string (private IP)
    - `PAYLOAD_SECRET` — CMS encryption key
-   - `GCS_BUCKET` (= `media.impulse-billiards.com`), `GCS_ACCESS_KEY_ID`, `GCS_SECRET_ACCESS_KEY` — GCP Cloud Storage (S3 interoperability HMAC keys)
-6. Health check endpoint: `GET /api/health` returns 200 only when the CMS is ready **and** the DB schema is current (applied migrations match the bundled migration files) — see [ci-cd.md](ci-cd.md#migration-failure-detection)
+   - `GITHUB_PAT` / `GITHUB_REPO` / `GITHUB_REF` — optional, for the static-site rebuild hook
+   - `GCS_BUCKET` / `GCS_ACCESS_KEY_ID` / `GCS_SECRET_ACCESS_KEY` — planned GCS storage (not yet wired; media currently uses local disk)
+6. Migrations: single-phase `payload migrate` runs from the migrator image **before** `docker compose up -d` — see [ci-cd.md](ci-cd.md#migration-failure-detection)
+7. Health check endpoint: `GET /api/health` (currently pings the DB) — see [ci-cd.md](ci-cd.md#migration-failure-detection)
 
 ---
 
@@ -80,14 +84,14 @@ build fetches published content → wrangler pages deploy (atomic)
 
 - Docker Compose has no `--rollback` flag (that's Swarm-only), so rollback = re-point the image to the last-known-good `{sha}` tag and run `docker compose up -d` — the previous image stays in GHCR
 - Health check with retries ensures the new container is actually serving before marking success
-- **Migrations are preceded by a pgBackRest backup**; on migration failure, restore the DB from that backup _and_ roll back the container — Docker alone cannot undo a schema change. The exact failure signals that trigger the restore are defined in [ci-cd.md](ci-cd.md#migration-failure-detection).
+- **Migrations run single-phase before deploy** (`payload migrate` from the migrator image). Automated pgBackRest backup/restore is planned but not yet implemented, so on migration failure the deploy aborts and recovery is manual — see [ci-cd.md](ci-cd.md#migration-failure-detection).
 - Cloudflare Pages deploys are atomic: the new static site goes live only after a successful build, with automatic rollback to the previous version on failure
 
 ---
 
 ## Staging Environment
 
-Staging runs on **VPS #3** (CX22, ~€8/mo) — a single VPS with everything bundled together.
+Staging runs on **VPS #3** (CX23, ~€6.59/mo) — a single VPS with everything bundled together.
 
 ### Staging vs Production
 
@@ -109,4 +113,4 @@ Staging runs on **VPS #3** (CX22, ~€8/mo) — a single VPS with everything bun
 
 ### Why Bundled on Staging?
 
-Staging only needs to validate deployments — it doesn't need the same isolation as production. Bundling CMS + DB on one CX22 (~€8/mo) keeps costs low while providing enough RAM to run Payload, Caddy, and PostgreSQL without OOM kills.
+Staging only needs to validate deployments — it doesn't need the same isolation as production. Bundling CMS + DB on one CX23 (~€6.59/mo) keeps costs low while providing enough RAM to run Payload, Caddy, and PostgreSQL without OOM kills.

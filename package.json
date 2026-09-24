@@ -25,6 +25,13 @@
     "typescript": "5.9.2"
   },
   "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "unrs-resolver"
+    ]
+  },
   "engines": {
     "node": ">=18"
   }

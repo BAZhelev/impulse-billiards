@@ -7,10 +7,14 @@ node_modules
 
 # Local env files
 .env
+.env.test
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local docker compose overrides
+docker-compose.override.yml
 
 # Testing
 coverage
@@ -26,6 +30,9 @@ coverage
 out/
 build
 dist
+
+# Payload CMS (local media uploads)
+apps/cms/media/
 
 
 # Debug

@@ -16,8 +16,6 @@ Impulse Billiards is a Turborepo monorepo with two primary applications:
 | `apps/web` | Static Next.js (exported)          | Public-facing website, served via CDN                 |
 | `apps/cms` | Payload CMS (Node.js + PostgreSQL) | Headless CMS for content management, admin panel, API |
 
-> `apps/docs` also exists in the repo but is leftover scaffolding from the `create-turbo` template (Turborepo/Vercel boilerplate) — not part of the product, and a candidate for removal.
-
 Compute and databases run on **Hetzner** VPSes; the static website runs on **Cloudflare Pages**; media and database backups are stored on **GCP Cloud Storage** — media is served to users through the **Cloudflare CDN**; DNS and CDN run on **Cloudflare**. The design prioritises simplicity, low cost, and operational clarity with minimal third-party dependencies.
 
 ---
@@ -66,7 +64,7 @@ Compute and databases run on **Hetzner** VPSes; the static website runs on **Clo
          │                                                      │
          │  ┌──────────────────────────┐  ┌──────────────────┐  │
          │  │  VPS #1 — Prod App       │  │  VPS #3 — Staging│  │
-         │  │  CX22, ~€8/mo            │  │  CX22, ~€8/mo    │  │
+         │  │  CX22, ~€8/mo            │  │  CX23, ~€6.59/mo │  │
          │  │                          │  │                  │  │
          │  │  ┌────────────────────┐  │  │  ┌────────────┐  │  │
          │  │  │  Caddy             │  │  │  │Caddy + CMS │  │  │
@@ -112,15 +110,15 @@ Compute and databases run on **Hetzner** VPSes; the static website runs on **Clo
 
 ## Provider Landscape
 
-| Provider            | Service                                    | Cost                |
-| ------------------- | ------------------------------------------ | ------------------- |
-| **Hetzner**         | 3× CX22 VPS (prod app, prod DB, staging)   | ~€24/mo             |
-| **GCP**             | Cloud Storage (media origin + backups)     | ~€3/mo              |
-| **Cloudflare**      | Pages + DNS + CDN (site + media) + DDoS    | Free                |
-| **Resend**          | Transactional email (100/day)              | Free                |
-| **Better Stack**    | External uptime monitoring + alerts        | Free                |
-| **GitHub**          | CI/CD (Actions), Container Registry (GHCR) | Free (public repos) |
-| **Total estimated** |                                            | **~€27/mo**         |
+| Provider            | Service                                         | Cost                |
+| ------------------- | ----------------------------------------------- | ------------------- |
+| **Hetzner**         | 2× CX22 (prod app, prod DB) + 1× CX23 (staging) | ~€23/mo             |
+| **GCP**             | Cloud Storage (media origin + backups)          | ~€3/mo              |
+| **Cloudflare**      | Pages + DNS + CDN (site + media) + DDoS         | Free                |
+| **Resend**          | Transactional email (100/day)                   | Free                |
+| **Better Stack**    | External uptime monitoring + alerts             | Free                |
+| **GitHub**          | CI/CD (Actions), Container Registry (GHCR)      | Free (public repos) |
+| **Total estimated** |                                                 | **~€26/mo**         |
 
 Compute on Hetzner for cost; static site on Cloudflare Pages (free); media + backups on GCP for reliability. No AWS, no Azure. Minimal provider sprawl.
 
@@ -135,15 +133,11 @@ impulse-billards/
 │ ├── web/ # Static Next.js — public website
 │ │ ├── package.json
 │ │ └── ...
-│ ├── docs/ # Leftover create-turbo template — not part of the product (remove or repurpose)
-│ │ ├── package.json
-│ │ └── ...
 │ └── cms/ # Payload CMS — admin + API (to be scaffolded)
 │ ├── Dockerfile
 │ ├── package.json
 │ └── ...
 ├── packages/
-│ ├── ui/ # Shared UI components
 │ ├── eslint-config/ # Shared ESLint config
 │ └── typescript-config/ # Shared TS config
 ├── infra/                    # Infrastructure configs
@@ -237,7 +231,7 @@ DNS setup in Cloudflare:
 | Hetzner for compute, GCP for media/backups | Cheap reliable VPS compute; GCP Cloud Storage for irreplaceable assets (media + backups)                                                 |
 | Docker Compose over Kubernetes             | Simple, predictable, easy to reason about; migrate to k3s later if needed                                                                |
 | Separate DB VPS for production             | Security (DB not on same host as public-facing app), resource isolation                                                                  |
-| Bundled CMS + DB on staging (CX22)         | Cost-saving while still having enough RAM; staging validates deployments                                                                 |
+| Bundled CMS + DB on staging (CX23)         | Cost-saving while still having enough RAM; staging validates deployments                                                                 |
 | External monitoring (Better Stack)         | Lives outside Hetzner failure domain; self-hosted monitor would die with the infra it watches                                            |
 | Cloudflare proxy for all domains           | Hides VPS IPs, DDoS protection + WAF everywhere; origin cert avoids double-SSL complexity                                                |
 | Staging auto-deploy, prod manual           | Fast feedback on main merge; manual gate prevents accidental production deploys                                                          |

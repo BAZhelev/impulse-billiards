@@ -1,5 +1,4 @@
 import { nextJsConfig } from "@repo/eslint-config/next-js";
-import { config as reactInternalConfig } from "@repo/eslint-config/react-internal";
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -12,29 +11,17 @@ export default [
       "**/build/**",
       "**/out/**",
       "**/next-env.d.ts",
+      "**/src/migrations/**",
     ],
   },
   // apps/web (Next.js App Router)
   ...nextJsConfig.map((c) => ({
     ...c,
-    files: ["apps/web/**/*.{js,jsx,ts,tsx}"],
+    files: ["apps/**/*.{js,jsx,ts,tsx}"],
+    ignores: ["src/payload-types.ts", "src/payload-generated-schema.ts"],
     rules: {
       ...c.rules,
       "@next/next/no-html-link-for-pages": ["error", "apps/web/app"],
     },
-  })),
-  // apps/docs (Next.js App Router)
-  ...nextJsConfig.map((c) => ({
-    ...c,
-    files: ["apps/docs/**/*.{js,jsx,ts,tsx}"],
-    rules: {
-      ...c.rules,
-      "@next/next/no-html-link-for-pages": ["error", "apps/docs/app"],
-    },
-  })),
-  // Packages (React internal + shared) — scope React rules to packages/*
-  ...reactInternalConfig.map((c) => ({
-    ...c,
-    files: ["packages/**/*.{js,jsx,ts,tsx}"],
   })),
 ];
